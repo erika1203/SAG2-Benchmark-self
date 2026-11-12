@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import time
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -15,8 +16,19 @@ from sag2 import JevClient, compact_json
 def write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
+
+
+def api_endpoint(base_url: str, route: str) -> str:
+    """Accept a base including /v1, or an already complete endpoint."""
+    url = base_url.rstrip("/")
+    parsed = urlsplit(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("Model API URL must be an absolute http(s) URL")
+    if parsed.query or parsed.fragment or parsed.username or parsed.password:
+        raise ValueError("Use a plain API URL; pass credentials through environment variables")
+    return url if url.endswith(route) else url + route
 
 
 def token_usage(response: dict) -> dict:
@@ -49,7 +61,7 @@ class RequestJournal:
         path = self.directory / service / f"{digest}.json"
         reused = path.exists()
         if reused:
-            record = json.loads(path.read_text())
+            record = json.loads(path.read_text(encoding="utf-8"))
             if "response" not in record:
                 raise ValueError(
                     f"Inspect the saved successful HTTP response before retrying: {path}"

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import time
 
-from model_api import RequestJournal, write_json
+from model_api import RequestJournal, api_endpoint, write_json
 from sag2 import compact_json, search_sag2
 
 PROMPTS = Path(__file__).resolve().parents[1] / "prompts"
@@ -111,7 +111,7 @@ class SAG2Tool:
 
 
 def agent_prompt(options: dict) -> str:
-    prompt = (PROMPTS / "agentic_sag2.txt").read_text().strip()
+    prompt = (PROMPTS / "agentic_sag2.txt").read_text(encoding="utf-8").strip()
     if options["max_tool_calls"] != 3:
         n = options["max_tool_calls"]
         prompt = prompt.replace("at most three times", f"at most {n} times").replace(
@@ -123,6 +123,11 @@ def agent_prompt(options: dict) -> str:
         prompt = prompt.replace(
             "exactly ten distinct IDs", f"exactly {options['top_k']} distinct IDs"
         )
+    if options.get("allow_fewer_results"):
+        count = "ten" if options["top_k"] == 10 else str(options["top_k"])
+        prompt = prompt.replace(
+            f"exactly {count} distinct IDs", f"at most {count} distinct IDs (fewer if fewer were found)"
+        )
     return prompt
 
 
@@ -131,11 +136,10 @@ async def run_agentic(
 ) -> dict:
     started = time.perf_counter()
     tool = SAG2Tool(index, jev, question, options)
-    schema = json.loads((PROMPTS / "sag2_tool.json").read_text())
-    final_schema = json.loads((PROMPTS / "agentic_result.json").read_text())
-    final_schema["properties"]["ranked_ids"].update(
-        minItems=options["top_k"], maxItems=options["top_k"]
-    )
+    schema = json.loads((PROMPTS / "sag2_tool.json").read_text(encoding="utf-8"))
+    final_schema = json.loads((PROMPTS / "agentic_result.json").read_text(encoding="utf-8"))
+    min_results = 0 if options.get("allow_fewer_results") else options["top_k"]
+    final_schema["properties"]["ranked_ids"].update(minItems=min_results, maxItems=options["top_k"])
     description = (
         f"Search the unmodified corpus with SAG2 ({options['max_hops']} expansion rounds), returning up to {options['return_k']} raw passages. "
         "The first query must be the exact original question. After the first search, supply the complete updated relation state and target one specific unresolved relationship using grounded entity names. "
@@ -146,17 +150,21 @@ async def run_agentic(
         {"role": "user", "content": question},
     ]
     trace = []
-    endpoint = llm["base_url"].rstrip("/") + (
-        "/responses" if llm["api"] == "responses" else "/chat/completions"
+    endpoint = api_endpoint(
+        llm["base_url"], "/responses" if llm["api"] == "responses" else "/chat/completions"
     )
+    score_service = getattr(jev, "service", "jev")
     for _ in range(options["max_tool_calls"] + 4):
-        payload = {"model": llm["model"], "parallel_tool_calls": False}
+        payload = {"model": llm["model"]}
+        if llm.get("parallel_tool_calls_parameter", True):
+            payload["parallel_tool_calls"] = False
         definition = {
             "name": "sag2_search",
             "description": description,
             "parameters": schema,
-            "strict": True,
         }
+        if llm.get("strict_tools", True):
+            definition["strict"] = True
         if llm["api"] == "responses":
             payload.update(
                 input=history,
@@ -178,8 +186,9 @@ async def run_agentic(
             payload.update(
                 messages=history,
                 tools=[{"type": "function", "function": definition}],
-                response_format={"type": "json_object"},
             )
+            if llm.get("json_mode", True):
+                payload["response_format"] = {"type": "json_object"}
             if llm["reasoning_effort"] != "default":
                 payload["reasoning_effort"] = llm["reasoning_effort"]
         response = await journal.post("llm", endpoint, api_key, payload)
@@ -232,7 +241,11 @@ async def run_agentic(
         if not calls:
             final = json.loads(final_text)
             ids = final["ranked_ids"]
-            if not tool.calls or not isinstance(ids, list) or len(ids) != options["top_k"]:
+            if (
+                not tool.calls
+                or not isinstance(ids, list)
+                or not min_results <= len(ids) <= options["top_k"]
+            ):
                 raise ValueError("Final output must rank the required number of retrieved passages")
             if any(type(i) is not int or i not in tool.evidence for i in ids) or len(
                 set(ids)
@@ -251,7 +264,7 @@ async def run_agentic(
                 "final": final,
                 "search_calls": len(tool.calls),
                 "trace": tool.calls,
-                "jev_usage": journal.summary("jev"),
+                f"{score_service}_usage": journal.summary(score_service),
                 "llm_usage": journal.summary("llm"),
                 "elapsed_ms": round((time.perf_counter() - started) * 1000),
             }

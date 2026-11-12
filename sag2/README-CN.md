@@ -108,6 +108,9 @@ JSON语料默认按纯文本分段；提供`path`时按文件后缀识别Markdow
 
 ## 快速开始
 
+**公司 API 与答案生成：** 使用新的 `scripts/run_sag2.py`，可独立切换仅检索/检索加生成、
+远程 Reranker/JEV、无/有 Agentic。该入口不自动评测；配置和命令见 [公司 API 指南](docs/company-api.md)。
+
 以下命令均在 **SAG-Benchmark/sag2/** 目录执行。原 SAG 读者请先进入 [sag/README-CN.md](../sag/README-CN.md)，使用该子项目独立的依赖和配置。
 
 ### 1. 安装
@@ -273,6 +276,8 @@ uv run python scripts/run_sag2_benchmark.py \
 
 | 脚本 | 用途 |
 |---|---|
+| `scripts/run_sag2.py` | 自有语料或 Benchmark 输入的独立检索/问答，支持公司 API |
+| `scripts/evaluate_sag2.py` | 读取已保存结果，离线计算检索指标 |
 | `scripts/run_sag2_benchmark.py` | 多跳数据集建库、SAG2、Agentic与本地Rerank评测 |
 | `scripts/build_enterprise_index.py` | Enterprise全库建库 |
 | `scripts/run_enterprise.py` | Enterprise只读索引评测 |
@@ -282,7 +287,7 @@ uv run python scripts/run_sag2_benchmark.py \
 | `scripts/verify_rerank_results.py` | 复核保留的Rerank结果 |
 | `scripts/search_local.py` | 使用本地Rerank查询自有JSON语料 |
 
-SAG2当前入口返回证据，不包含原SAG的答案生成和LLM Judge流程。原论文的上传、检索、问答和Judge命令完整保留在 [sag/](../sag/README-CN.md)。
+论文复现入口返回检索证据；新的 `run_sag2.py --task qa` 可用 OpenAI 兼容 LLM 生成带来源的答案，评测单独执行。原论文的上传、检索、问答和Judge命令完整保留在 [sag/](../sag/README-CN.md)。
 
 ## Agentic SAG2
 

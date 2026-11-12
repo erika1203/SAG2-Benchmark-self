@@ -18,10 +18,10 @@ class DatasetLoader:
                 raise FileNotFoundError(f"Missing dataset source: {path}")
 
     def load_corpus(self):
-        return json.loads(self.corpus_path.read_text())
+        return json.loads(self.corpus_path.read_text(encoding="utf-8"))
 
     def load_samples(self):
-        return json.loads(self.samples_path.read_text())
+        return json.loads(self.samples_path.read_text(encoding="utf-8"))
 
     def get_docs(self):
         return list(

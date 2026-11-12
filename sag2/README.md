@@ -108,6 +108,10 @@ JSON corpus text is treated as plain text by default; a supplied `path` selects 
 
 ## Quick Start
 
+**Company APIs and answer generation:** `scripts/run_sag2.py` independently selects retrieval/QA,
+remote reranker/Jev, and Agentic on/off. Evaluation is a separate command. See the
+[company API guide (Chinese)](docs/company-api.md) for configuration and commands.
+
 Run the following commands from **SAG-Benchmark/sag2/**. Original SAG readers should instead follow [sag/README.md](../sag/README.md), which has its own environment and dependencies.
 
 ### 1. Install
@@ -273,6 +277,8 @@ Plain SAG2 resumes completed questions. Agentic and local modes also reuse succe
 
 | Script | Purpose |
 |---|---|
+| `scripts/run_sag2.py` | Standalone retrieval/QA over custom corpora or benchmark inputs with company APIs |
+| `scripts/evaluate_sag2.py` | Offline retrieval evaluation of saved results |
 | `scripts/run_sag2_benchmark.py` | Multi-hop indexing, SAG2, Agentic and local evaluation |
 | `scripts/build_enterprise_index.py` | Full Enterprise index construction |
 | `scripts/run_enterprise.py` | Enterprise evaluation over an existing read-only index |
@@ -282,7 +288,7 @@ Plain SAG2 resumes completed questions. Agentic and local modes also reuse succe
 | `scripts/verify_rerank_results.py` | Verify retained reranking results |
 | `scripts/search_local.py` | Query a custom JSON corpus with local reranking |
 
-The current SAG2 entry points return evidence. The original SAG upload, answer-generation and LLM Judge workflows are preserved separately in [sag/](../sag/README.md).
+The paper reproduction entry points return evidence. The new `run_sag2.py --task qa` generates answers with source references through an OpenAI-compatible LLM; evaluation runs separately. The original SAG upload, answer-generation and LLM Judge workflows are preserved separately in [sag/](../sag/README.md).
 
 ## Agentic SAG2
 

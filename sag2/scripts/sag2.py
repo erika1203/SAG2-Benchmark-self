@@ -754,6 +754,8 @@ class CorpusIndex:
 
 
 class JevClient:
+    service = "jev"
+
     def __init__(
         self,
         session: aiohttp.ClientSession,
@@ -942,6 +944,7 @@ async def search_sag2(
         raise ValueError("SAG2 supports at most two expansion rounds")
     started = time.perf_counter()
     retained, carried, protected, latest = {}, {}, {}, {}
+    service = getattr(client, "service", "jev")
     expanded, seen = set(), set()
     frontier, trace, baseline = [], [], []
     usage = {"requests": 0, "judgments": 0, "input_tokens": 0, "output_tokens": 0, "batches": []}
@@ -1013,7 +1016,7 @@ async def search_sag2(
         seen.update(retained)
         trace.append(
             {
-                "stage": "jev",
+                "stage": service,
                 "hop": hop,
                 "count": len(scored),
                 "carried_seed_count": len(carried),
@@ -1037,7 +1040,7 @@ async def search_sag2(
         "candidates": final,
         "baseline": baseline,
         "trace": trace,
-        "jev_usage": usage,
+        f"{service}_usage": usage,
         "elapsed_ms": round((time.perf_counter() - started) * 1000),
         "algorithm": "SAG2",
     }
